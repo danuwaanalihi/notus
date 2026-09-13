@@ -18,6 +18,11 @@ from .const import (
 )
 from .controls import CONTROLS
 
+_GOOGLE_SYNC_ERROR_MESSAGE = (
+    "Device ID cannot be found. This is usually an indication that the device "
+    "may have been removed. Send a Request Sync to re-sync the device in Google."
+)
+
 
 class BSKNotusError(Exception):
     """Base exception for BSK NOTUS API errors."""
@@ -33,6 +38,10 @@ class BSKNotusConnectionError(BSKNotusError):
 
 class BSKNotusResponseError(BSKNotusError):
     """The BSK Connect API returned an unexpected response."""
+
+
+class BSKNotusSyncError(BSKNotusResponseError):
+    """Known Google sync failure; only exact read-back can confirm the write."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -175,7 +184,17 @@ class BSKNotusClient:
                     detail = _write_error_detail(
                         body, (self._token, self._username, self._password, device_id)
                     )
-                    raise BSKNotusResponseError(
+                    error_type = BSKNotusResponseError
+                    message = (
+                        body.get("message", body.get("error"))
+                        if isinstance(body, Mapping) else None
+                    )
+                    if response.status == HTTPStatus.BAD_REQUEST and (
+                        message == _GOOGLE_SYNC_ERROR_MESSAGE
+                        or message == [_GOOGLE_SYNC_ERROR_MESSAGE]
+                    ):
+                        error_type = BSKNotusSyncError
+                    raise error_type(
                         f"Control request failed with HTTP {response.status}{detail}"
                     )
         except (ClientError, TimeoutError) as err:

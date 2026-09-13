@@ -41,6 +41,8 @@ Each discovered NOTUS is represented as one Home Assistant device. The stable id
 
 Controls require the verified model/type, a real `deviceID` and a valid existing field. Other readable NOTUS models retain read-only discovery. Existing sensor and binary-sensor identities are unchanged. Free cooling, operation mode, boost speed/time and installer settings remain read-only or unexposed.
 
+The app uses configurable fan presets. Production testing confirmed supply fan 40 → 60 → 40%; a request for 41% instead read back as 60% and was reported as a mismatch. Arbitrary fan percentages and fractional temperature setpoints are not yet confirmed on hardware.
+
 ### Sensors
 
 - Return temperature
@@ -90,6 +92,8 @@ The integration uses only these cloud operations:
 Device polling is approximately every 60 seconds. If the device-list request returns HTTP 401, the integration performs one fresh login and retries the read once.
 
 Each write is preceded by a fresh identity/capability check and followed by cloud read-back, including after an HTTP error or timeout. A failed or mismatched confirmation raises a service error; the integration never fabricates the requested state. An uncertain PUT is not automatically repeated. Read-back can take several seconds while the cloud catches up. A valid cloud value confirms the setting reported by BSK, not an independent measurement of the physical output.
+
+BSK can return one specific HTTP 400 Google Request Sync error after applying a setting. The integration accepts this known response only if fresh read-back confirms the exact requested field and value. Other write errors remain service errors even when read-back succeeds; see the [confirmation contract](docs/write-protocol.md#confirmation-and-concurrency-contract).
 
 ## Installation with HACS
 

@@ -60,8 +60,16 @@ option labels divide the numeric wire value by 10. The app's selector offers
 16–30 °C in whole degrees; it establishes the wire scaling, not the complete
 hardware range. This integration uses the separately confirmed NOTUS Modbus
 range 150–300 (15–30 °C), with a 0.1 °C step. Fan and humidity bounds are
-0–100%, also from the confirmed device semantics. Fractional cloud setpoints
-and the reversible 21.0 → 21.5 → 21.0 test still require production validation.
+0–100%, also from the confirmed device semantics. The production temperature
+test did not confirm 21.5 °C; fractional cloud setpoints remain unverified.
+
+The app presents configurable fan presets. For supply, module 1639 (function
+16591) reads `venFanNightSpeed`, `venFanLowSpeed`, `venFanMediumSpeed`,
+`venFanHighSpeed` and `venFanBoostSpeed`, with defaults 20/40/60/80/100%.
+On 2026-09-13, a production supply request of 41% read back as 60%; a subsequent
+explicit 40 → 60 → 40% test confirmed both requested values. This does not
+establish a general rounding rule or guarantee arbitrary percentage support.
+The integration reports a mismatch and shows the actual cloud value.
 
 No writable operation mode, free cooling, boost speed/duration, heater or
 installer settings are exposed in v0.2.0. The live operation-mode string is
@@ -79,9 +87,20 @@ not used to guess a writable enum.
    propagation; each control read is bounded to 20 seconds.
 5. Publish only data received through the read API. A successful PUT is not a
    confirmed state. Report an error if the requested field does not match.
-6. If read-back fails, mark coordinator state unavailable. If a rejected or
-   uncertain PUT is followed by a valid read, publish that actual state and
-   still report the write error. Do not hide an uncertain transaction.
+6. If read-back fails, mark coordinator state unavailable. For a rejected or
+   uncertain PUT, publish any valid read-back and retain the write error, with
+   one narrowly verified exception: HTTP 400 with the exact Google Request
+   Sync message below is accepted only when the same device's requested field
+   matches exactly in fresh read-back. Other HTTP errors, authentication
+   failures, transport errors and mismatched values still report failure.
+
+The applied supply writes above both returned this HTTP 400 message:
+
+> Device ID cannot be found. This is usually an indication that the device may have been removed. Send a Request Sync to re-sync the device in Google.
+
+This response is classified separately; it is not proof that a write succeeded
+or failed. Only the subsequent exact cloud confirmation permits service success.
+The exception does not retry the PUT or trigger Google synchronization.
 
 This verifies the cloud-reported setting; it does not independently prove
 physical airflow or heating output. Integration unload/shutdown cancellation

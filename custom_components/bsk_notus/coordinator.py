@@ -8,7 +8,13 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .api import BSKNotusAuthError, BSKNotusClient, BSKNotusError, NotusDevice
+from .api import (
+    BSKNotusAuthError,
+    BSKNotusClient,
+    BSKNotusError,
+    BSKNotusSyncError,
+    NotusDevice,
+)
 from .const import DOMAIN, LOGGER, SCAN_INTERVAL
 from .controls import CONTROLS, NotusControl, supports_control
 
@@ -78,16 +84,22 @@ class BSKNotusCoordinator(DataUpdateCoordinator[dict[str, NotusDevice]]):
                 devices = await self._async_read_back(identity, control, raw)
                 self.async_set_updated_data({d.identity: d for d in devices})
                 device = self.data.get(identity)
-                if write_error is not None:
+                confirmed = (
+                    device is not None
+                    and supports_control(device, control)
+                    and control.raw_value(device.value(key)) == raw
+                )
+                # This exact Google sync error has followed applied writes.
+                # A fresh, matching device/field is still required; all other
+                # errors and mismatched values retain their failure status.
+                if isinstance(write_error, BSKNotusSyncError) and confirmed:
+                    LOGGER.debug("NOTUS cloud confirmed the write despite Google sync failure")
+                elif write_error is not None:
                     raise HomeAssistantError(
                         f"NOTUS write failed or was uncertain ({write_error}); "
                         "cloud state was refreshed"
                     ) from write_error
-                if (
-                    device is None
-                    or not supports_control(device, control)
-                    or control.raw_value(device.value(key)) != raw
-                ):
+                if not confirmed:
                     raise HomeAssistantError(
                         "BSK Connect did not confirm the requested value; "
                         "Home Assistant shows the latest cloud state"

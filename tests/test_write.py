@@ -14,6 +14,7 @@ from custom_components.bsk_notus.api import (
     BSKNotusClient,
     BSKNotusConnectionError,
     BSKNotusResponseError,
+    BSKNotusSyncError,
     notus_device_from_payload,
 )
 from custom_components.bsk_notus.controls import CONTROLS, supports_control
@@ -23,6 +24,11 @@ from custom_components.bsk_notus.switch import BSKNotusSwitch
 from custom_components.bsk_notus.sensor import SENSORS, BSKNotusSensor
 from custom_components.bsk_notus.binary_sensor import BINARY_SENSORS
 from custom_components.bsk_notus import number, switch
+
+GOOGLE_SYNC_ERROR = (
+    "Device ID cannot be found. This is usually an indication that the device "
+    "may have been removed. Send a Request Sync to re-sync the device in Google."
+)
 
 
 def device(**changes):
@@ -131,6 +137,25 @@ class ApiTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("test@example.invalid", message)
         self.assertNotIn("must not be exposed", message)
 
+    async def test_only_exact_google_sync_http_400_is_classified(self):
+        for status, body, expected in [
+            (400, {"message": GOOGLE_SYNC_ERROR}, BSKNotusSyncError),
+            (400, {"message": [GOOGLE_SYNC_ERROR]}, BSKNotusSyncError),
+            (400, {"error": GOOGLE_SYNC_ERROR}, BSKNotusSyncError),
+            (503, {"message": GOOGLE_SYNC_ERROR}, BSKNotusResponseError),
+            (403, {"message": GOOGLE_SYNC_ERROR}, BSKNotusResponseError),
+            (400, {"message": "Device ID cannot be found."}, BSKNotusResponseError),
+            (400, {"message": [GOOGLE_SYNC_ERROR, "invalid value"]}, BSKNotusResponseError),
+            (400, {"message": {"detail": GOOGLE_SYNC_ERROR}}, BSKNotusResponseError),
+        ]:
+            with self.subTest(status=status, body=body):
+                self.session.put.reset_mock()
+                self.session.put.return_value = Response(status=status, body=body)
+                with self.assertRaises(BSKNotusResponseError) as raised:
+                    await self.client.async_write_control("test-device", "ventilatorFanSpeed", 60)
+                self.assertIs(type(raised.exception), expected)
+                self.session.put.assert_called_once()
+
 
 class ControlTests(unittest.TestCase):
     def test_ranges_scaling_and_invalid_numbers(self):
@@ -212,7 +237,39 @@ class CoordinatorTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.client.async_list_notus_devices.await_count, 5)
         self.assertEqual(self.coordinator.data["test-device"].value("setTemperature"), 210)
 
+    async def test_google_sync_error_with_exact_read_back_confirms_without_resend(self):
+        before, after = device(), device(ventilatorFanSpeed=60)
+        self.client.async_write_control.side_effect = BSKNotusSyncError(GOOGLE_SYNC_ERROR)
+        self.client.async_list_notus_devices.side_effect = [[before], [before], [after]]
+        entity = BSKNotusNumber(self.coordinator, before, CONTROLS["ventilatorFanSpeed"])
+        published = []
+        self.coordinator.async_update_listeners = lambda: published.append(entity.native_value)
+        await entity.async_set_native_value(60)
+        self.assertEqual(published, [60])
+        self.assertTrue(entity.available)
+        self.assertEqual(self.coordinator.data["test-device"].value("aspiratorFanSpeed"), 40)
+        self.client.async_write_control.assert_awaited_once_with("test-device", "ventilatorFanSpeed", 60)
+
+    async def test_google_sync_error_with_different_value_still_fails(self):
+        self.client.async_write_control.side_effect = BSKNotusSyncError(GOOGLE_SYNC_ERROR)
+        self.client.async_list_notus_devices.side_effect = [[device()]] + [[device(ventilatorFanSpeed=60)]] * 4
+        with self.assertRaisesRegex(HomeAssistantError, "write failed"):
+            await self.coordinator.async_set_control("test-device", "ventilatorFanSpeed", 41)
+        self.assertEqual(self.coordinator.data["test-device"].value("ventilatorFanSpeed"), 60)
+        self.assertTrue(self.coordinator.last_update_success)
+        self.assertEqual(self.client.async_list_notus_devices.await_count, 5)
+        self.client.async_write_control.assert_awaited_once()
+
+    async def test_unknown_http_error_with_matching_read_back_still_fails(self):
+        self.client.async_write_control.side_effect = BSKNotusResponseError("HTTP 400: invalid value")
+        self.client.async_list_notus_devices.side_effect = [[device()], [device(ventilatorFanSpeed=60)]]
+        with self.assertRaisesRegex(HomeAssistantError, "HTTP 400: invalid value"):
+            await self.coordinator.async_set_control("test-device", "ventilatorFanSpeed", 60)
+        self.assertEqual(self.coordinator.data["test-device"].value("ventilatorFanSpeed"), 60)
+        self.client.async_write_control.assert_awaited_once()
+
     async def test_failed_read_back_marks_state_unavailable(self):
+        self.client.async_write_control.side_effect = BSKNotusSyncError(GOOGLE_SYNC_ERROR)
         self.client.async_list_notus_devices.side_effect = [[device()]] + [BSKNotusConnectionError("offline")] * 4
         entity = BSKNotusNumber(self.coordinator, device(), CONTROLS["setTemperature"])
         with self.assertRaisesRegex(HomeAssistantError, "Cannot confirm"):

@@ -50,6 +50,28 @@
       "firmware": {"name": "Firmvér"},
       "mainboard_firmware": {"name": "Firmvér základnej dosky"}
     },
+    "switch": {
+      "power": {
+        "name": "Napájanie"
+      },
+      "manual_boost": {
+        "name": "Manuálny boost"
+      }
+    },
+    "number": {
+      "supply_fan_speed": {
+        "name": "Rýchlosť prívodného ventilátora"
+      },
+      "extract_fan_speed": {
+        "name": "Rýchlosť odťahového ventilátora"
+      },
+      "target_temperature": {
+        "name": "Cieľová teplota"
+      },
+      "target_humidity": {
+        "name": "Cieľová vlhkosť"
+      }
+    },
     "binary_sensor": {
       "power": {"name": "Napájanie"},
       "filter_warning": {"name": "Upozornenie filtra"},

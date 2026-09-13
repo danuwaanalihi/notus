@@ -50,6 +50,28 @@
       "firmware": {"name": "Firmware"},
       "mainboard_firmware": {"name": "Mainboard firmware"}
     },
+    "switch": {
+      "power": {
+        "name": "Power"
+      },
+      "manual_boost": {
+        "name": "Manual boost"
+      }
+    },
+    "number": {
+      "supply_fan_speed": {
+        "name": "Supply fan speed"
+      },
+      "extract_fan_speed": {
+        "name": "Extract fan speed"
+      },
+      "target_temperature": {
+        "name": "Target temperature"
+      },
+      "target_humidity": {
+        "name": "Target humidity"
+      }
+    },
     "binary_sensor": {
       "power": {"name": "Power"},
       "filter_warning": {"name": "Filter warning"},

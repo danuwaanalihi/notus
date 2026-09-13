@@ -171,8 +171,12 @@ class BSKNotusClient:
                     self._token = None
                     raise BSKNotusAuthError("BSK Connect rejected the write token")
                 if not 200 <= response.status < 300:
+                    body = await _safe_json(response)
+                    detail = _write_error_detail(
+                        body, (self._token, self._username, self._password, device_id)
+                    )
                     raise BSKNotusResponseError(
-                        f"Control request failed with HTTP {response.status}"
+                        f"Control request failed with HTTP {response.status}{detail}"
                     )
         except (ClientError, TimeoutError) as err:
             raise BSKNotusConnectionError(
@@ -279,3 +283,18 @@ def _message_from_body(body: Any, status: int) -> str:
     if isinstance(body, Mapping) and body.get("message") is not None:
         return str(body["message"])
     return f"Authentication failed with HTTP {status}"
+
+
+def _write_error_detail(body: Any, sensitive: tuple[str | None, ...]) -> str:
+    """Retain bounded server validation errors without exposing credentials."""
+    if not isinstance(body, Mapping):
+        return ""
+    message = body.get("message", body.get("error"))
+    if isinstance(message, list):
+        message = "; ".join(item for item in message if isinstance(item, str))
+    if not isinstance(message, str):
+        return ""
+    for value in sorted((v for v in sensitive if v), key=len, reverse=True):
+        message = message.replace(value, "[redacted]")
+    message = " ".join(message.split())[:512]
+    return f": {message}" if message else ""

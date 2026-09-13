@@ -159,8 +159,7 @@ class BSKNotusClient:
             not isinstance(device_id, str)
             or not device_id.strip()
             or control is None
-            or type(raw) is not int
-            or control.raw_value(raw) is None
+            or not control.valid_write(raw)
         ):
             raise BSKNotusResponseError("Invalid NOTUS control request")
         if self._token is None:

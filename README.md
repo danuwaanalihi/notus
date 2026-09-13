@@ -7,7 +7,7 @@ Unofficial Home Assistant integration for BSK NOTUS heat-recovery ventilation un
 
 ## Status
 
-Version **0.2.0** preserves all 28 read-only entities from v0.1.0 and adds six user controls for the verified `BSK-IGK-LCD-V1.0` / `IGKLCDV10Device`.
+Version **0.3.0** preserves all 28 read-only entities from v0.1.0 and the six v0.2.0 control identities. It adds configurable fan presets and free cooling mode for the verified `BSK-IGK-LCD-V1.0` / `IGKLCDV10Device`. A device with all supported fields has 47 entities: 28 read-only entities and 19 controls.
 
 The NOTUS write endpoint and sparse payload are grounded in the BSK Connect Android client. See [protocol evidence and confirmation behavior](docs/write-protocol.md). All control state comes from cloud read-back. Writes and polling are serialized; parallel changes send separate fields and cannot replay an old full-device snapshot.
 
@@ -34,14 +34,23 @@ Each discovered NOTUS is represented as one Home Assistant device. The stable id
 | --- | --- | --- |
 | Power switch | Off / On | `deviceStatus` |
 | Manual boost switch | Off / On | `manualBoostState` |
-| Supply fan speed number | 0–100%, step 1% | `ventilatorFanSpeed` |
-| Extract fan speed number | 0–100%, step 1% | `aspiratorFanSpeed` |
-| Target temperature number | 15.0–30.0 °C, step 0.1 °C | `setTemperature` (raw tenths) |
+| Supply fan preset select | Night / Low / Medium / High / Boost | `ventilatorFanSpeed`, using current preset percentages |
+| Extract fan preset select | Night / Low / Medium / High / Boost | `aspiratorFanSpeed`, using current preset percentages |
+| Supply fan speed number | 0 or a configured preset percentage | `ventilatorFanSpeed` |
+| Extract fan speed number | 0 or a configured preset percentage | `aspiratorFanSpeed` |
+| Five supply preset percentage numbers | 0–100%, step 1% | `venFanNightSpeed`, `venFanLowSpeed`, `venFanMediumSpeed`, `venFanHighSpeed`, `venFanBoostSpeed` |
+| Five extract preset percentage numbers | 0–100%, step 1% | Corresponding `aspFan…Speed` fields |
+| Target temperature number | 15–30 °C, step 1 °C | `setTemperature` (raw tenths) |
 | Target humidity number | 0–100%, step 1% | `setHumidity` |
+| Free cooling mode select | Off / On / Auto | `freeCoolingSetting` (0 / 1 / 2) |
 
-Controls require the verified model/type, a real `deviceID` and a valid existing field. Other readable NOTUS models retain read-only discovery. Existing sensor and binary-sensor identities are unchanged. Free cooling, operation mode, boost speed/time and installer settings remain read-only or unexposed.
+Controls require the verified model/type, a real `deviceID` and a valid existing field. Fan percentage controls additionally require `opMode == "CS"`; the app uses different units in other modes. Other readable NOTUS models retain read-only discovery. Existing sensor and binary-sensor identities are unchanged. Operation mode, manual boost speed/time and installer settings remain read-only or unexposed.
 
-The app uses configurable fan presets. Production testing confirmed supply fan 40 → 60 → 40%; a request for 41% instead read back as 60% and was reported as a mismatch. Arbitrary fan percentages and fractional temperature setpoints are not yet confirmed on hardware.
+The app's **Advanced Settings → Fan speeds** page configures each named preset separately for both fans. The ten corresponding HA numbers appear under Configuration. Selecting a preset resolves its percentage from a fresh cloud payload under the write lock, including after another queued preset edit. Missing or invalid percentages are never replaced with defaults. Changing a preset's percentage and selecting that preset are separate commands; HA only shows resulting values confirmed by the cloud.
+
+The original fan numbers remain usable for 0 (fan off) or percentages currently assigned to a preset. A nonconfigured percentage is rejected locally. Select attributes show the current percentage and preset mapping. If multiple presets have the same percentage, or the reported fan speed matches none, the selected name is unknown rather than guessed.
+
+Production v0.2.0 tests confirmed 40 → 60 → 40% on both fans, 21 → 22 → 21 °C, humidity 70 → 75/71 → 70%, boost off/on/off and power on/off/on. A 21.5 °C request stayed at 21.0 °C after 87 seconds; fractional temperature writes are now rejected locally. The numeric read scaling remains unchanged. New preset configuration and free cooling production results are recorded in the deployment PR.
 
 ### Sensors
 
@@ -91,7 +100,9 @@ The integration uses only these cloud operations:
 
 Device polling is approximately every 60 seconds. If the device-list request returns HTTP 401, the integration performs one fresh login and retries the read once.
 
-Each write is preceded by a fresh identity/capability check and followed by cloud read-back, including after an HTTP error or timeout. A failed or mismatched confirmation raises a service error; the integration never fabricates the requested state. An uncertain PUT is not automatically repeated. Read-back can take several seconds while the cloud catches up. A valid cloud value confirms the setting reported by BSK, not an independent measurement of the physical output.
+Each write is preceded by a fresh identity/capability check and followed by cloud read-back, including after an HTTP error or timeout. Confirmation starts with quick reads, then reads at longer intervals, with a 90-second total confirmation limit. A failed or mismatched confirmation raises a service error; the integration never fabricates the requested state. An uncertain PUT is not automatically repeated. Later writes wait for the entire confirmation, then recheck fresh cloud state. A valid cloud value confirms the setting reported by BSK, not an independent measurement of the physical output.
+
+Free cooling mode is the requested Off/On/Auto setting. The existing Free cooling binary sensor continues to report `freeCoolingStatus`; it can differ from the selected mode, particularly in Auto.
 
 BSK can return one specific HTTP 400 Google Request Sync error after applying a setting. The integration accepts this known response only if fresh read-back confirms the exact requested field and value. Other write errors remain service errors even when read-back succeeds; see the [confirmation contract](docs/write-protocol.md#confirmation-and-concurrency-contract).
 

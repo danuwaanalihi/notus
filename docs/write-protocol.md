@@ -1,4 +1,4 @@
-# NOTUS v0.2.0 cloud write evidence
+# NOTUS cloud write evidence (v0.3.0)
 
 ## Source and reproducibility
 
@@ -37,7 +37,7 @@ PUT /device?deviceID=<device.deviceID>
 Authorization: <accessToken>
 Content-Type: application/json
 
-{"setTemperature": 215}
+{"setTemperature": 220}
 ```
 
 Only the real `deviceID` from a fresh device payload may address a write.
@@ -53,15 +53,20 @@ Read discovery's `mbDeviceId`/`_id` fallbacks do not authorize control.
 | Extract fan speed | `aspiratorFanSpeed` | integer percent | Module 1638, function 16582 |
 | Target temperature | `setTemperature` | integer tenths of °C | Advanced settings module 1645; SelectPrimary module 1647; temperature options module 1648, function 16728 |
 | Target humidity | `setHumidity` | integer percent | Advanced settings module 1645; SelectPrimary module 1647 |
+| Free cooling mode | `freeCoolingSetting` | 0 Off / 1 On / 2 Auto | Advanced settings function 16649; options function 16730; SelectPrimary function 16700 |
+| Five supply preset percentages | `venFanNightSpeed`, `venFanLowSpeed`, `venFanMediumSpeed`, `venFanHighSpeed`, `venFanBoostSpeed` | integer percent in CS mode | Advanced settings function 16649; SelectSecondary functions 16705 / 16712 |
+| Five extract preset percentages | Corresponding `aspFan…Speed` fields | integer percent in CS mode | Advanced settings function 16649; SelectSecondary functions 16705 / 16708 |
 
 `SelectPrimary` constructs a body containing its `tag` and selected numeric
 value, passes the deviceID query, then refreshes device state. Temperature
 option labels divide the numeric wire value by 10. The app's selector offers
 16–30 °C in whole degrees; it establishes the wire scaling, not the complete
 hardware range. This integration uses the separately confirmed NOTUS Modbus
-range 150–300 (15–30 °C), with a 0.1 °C step. Fan and humidity bounds are
-0–100%, also from the confirmed device semantics. The production temperature
-test did not confirm 21.5 °C; fractional cloud setpoints remain unverified.
+range 150–300 (15–30 °C). v0.3.0 writes use raw step 10 (1 °C); existing
+cloud values still parse with unchanged tenths scaling. Production confirmed
+21 → 22 → 21 °C, but a 21.5 °C request remained at 21 °C after 87 seconds.
+Fractional writes are therefore rejected before reaching the cloud. Fan and
+humidity bounds are 0–100%, from the confirmed device semantics.
 
 The app presents configurable fan presets. For supply, module 1639 (function
 16591) reads `venFanNightSpeed`, `venFanLowSpeed`, `venFanMediumSpeed`,
@@ -69,11 +74,42 @@ The app presents configurable fan presets. For supply, module 1639 (function
 On 2026-09-13, a production supply request of 41% read back as 60%; a subsequent
 explicit 40 → 60 → 40% test confirmed both requested values. This does not
 establish a general rounding rule or guarantee arbitrary percentage support.
-The integration reports a mismatch and shows the actual cloud value.
+v0.3.0 rejects nonconfigured fan percentages locally (except 0, fan off).
+The original number identities remain available alongside named selectors.
 
-No writable operation mode, free cooling, boost speed/duration, heater or
-installer settings are exposed in v0.2.0. The live operation-mode string is
-not used to guess a writable enum.
+### Configurable fan percentages
+
+The IGKLCDV10 Advanced Settings screen (module 1645, function 16649) contains
+the **Fan speeds** card. For each of Boost, High, Medium, Low and Night, it
+passes the matching `aspFan…Speed` and `venFan…Speed` fields as `tag_1` and
+`tag_2` to `SelectSecondary` (module 1647, function 16705). Its two callbacks
+(16708 and 16712) pass `{deviceID: device.deviceID}` and a sparse one-tag body
+to the same verified `Device.put` wrapper, then refresh.
+
+`FAN_SPEED_OPTIONS` (module 1648, function 16727) produces integers 0–100
+labelled percent when `opMode` is `CS`; other modes use different units.
+HA percentage writes therefore require fresh `opMode == "CS"`. This does not
+add any writable operation-mode mapping.
+
+The five-field tables are read from the actual device payload, without the
+app's default fallbacks. A selector resolves the chosen name under the shared
+write lock, after fresh preflight, and writes only the resulting fan-speed
+field. Preset configuration writes update only their own field. Missing or
+invalid tables disable the selector. A percentage matching multiple names
+does not establish which name was selected, so the name is reported unknown.
+
+### Free cooling
+
+Advanced Settings passes `freeCoolingSetting` to `SelectPrimary` with
+`FREE_COOLING_OPTIONS` (function 16730): Off=0, On=1 and Auto=2, matching the
+confirmed Modbus semantics. The app also offers Summer=3; that additional
+mode is outside the confirmed device semantics and is not writable here.
+The existing `freeCoolingStatus` binary sensor is a separate running-state
+field and is never used as the setting or as write confirmation.
+
+No writable operation mode, manual boost speed/duration, heater or installer
+settings are exposed. The live operation-mode string is not used to guess a
+writable enum.
 
 ## Confirmation and concurrency contract
 
@@ -83,8 +119,11 @@ not used to guess a writable enum.
 3. PUT exactly one allowlisted integer field, with a 20-second request timeout.
    Reject redirects. Never resend an ambiguous write or replay a full snapshot.
 4. Always attempt `/device-user` read-back after the PUT, including HTTP failures
-   and transport timeouts. Allow up to four reads, two seconds apart, for cloud
-   propagation; each control read is bounded to 20 seconds.
+   and transport timeouts. For successful PUTs and the known Google sync error,
+   read delays are 0, 2, 2, 2, 5, 10, 10, 10, 10, 10, 10 and 10 seconds. The
+   entire confirmation phase, including request time, is capped at 90 seconds;
+   each control read is also bounded to 20 seconds. Other PUT errors retain the
+   previous four-read window and always retain their error status.
 5. Publish only data received through the read API. A successful PUT is not a
    confirmed state. Report an error if the requested field does not match.
 6. If read-back fails, mark coordinator state unavailable. For a rejected or

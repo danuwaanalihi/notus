@@ -6,10 +6,17 @@ from homeassistant.components.number import NumberDeviceClass, NumberEntity, Num
 from homeassistant.const import PERCENTAGE, UnitOfTemperature
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .api import NotusDevice
-from .controls import NUMBER_CONTROLS, NotusControl, supports_control
+from .controls import (
+    FAN_PRESET_FIELDS,
+    NUMBER_CONTROLS,
+    NotusControl,
+    fan_preset_values,
+    supports_control,
+)
 from .coordinator import BSKNotusConfigEntry, BSKNotusCoordinator
 from .entity import BSKNotusEntity
 
@@ -41,7 +48,9 @@ class BSKNotusNumber(BSKNotusEntity, NumberEntity):
         self._attr_translation_key = control.translation_key
         self._attr_native_min_value = control.minimum / control.scale
         self._attr_native_max_value = control.maximum / control.scale
-        self._attr_native_step = 1 / control.scale
+        self._attr_native_step = control.step / control.scale
+        if control.is_config:
+            self._attr_entity_category = EntityCategory.CONFIG
         if control.key == "setTemperature":
             self._attr_device_class = NumberDeviceClass.TEMPERATURE
             self._attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
@@ -65,6 +74,17 @@ class BSKNotusNumber(BSKNotusEntity, NumberEntity):
             return None
         raw = self.control.raw_value(self.device.value(self.control.key))
         return None if raw is None else raw / self.control.scale
+
+    @property
+    @override
+    def extra_state_attributes(self) -> dict | None:
+        if self.device is None or self.control.key not in FAN_PRESET_FIELDS:
+            return None
+        values = fan_preset_values(self.device, self.control.key)
+        return {
+            "preset_percentages": values,
+            "valid_values": sorted({0, *values.values()}) if values else [],
+        }
 
     @override
     async def async_set_native_value(self, value: float) -> None:

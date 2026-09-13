@@ -80,7 +80,8 @@ class BSKNotusCoordinator(DataUpdateCoordinator[dict[str, NotusDevice]]):
                 device = self.data.get(identity)
                 if write_error is not None:
                     raise HomeAssistantError(
-                        "NOTUS write failed or was uncertain; cloud state was refreshed"
+                        f"NOTUS write failed or was uncertain ({write_error}); "
+                        "cloud state was refreshed"
                     ) from write_error
                 if (
                     device is None

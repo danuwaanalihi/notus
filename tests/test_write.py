@@ -117,6 +117,20 @@ class ApiTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.session.get.call_args.kwargs["headers"], {"Authorization": "new-token"})
         self.session.put.assert_not_called()
 
+    async def test_write_rejection_keeps_status_and_redacts_server_message(self):
+        self.session.put.return_value = Response(status=400, body={
+            "message": ["setTemperature is invalid", "synthetic-token test-device test@example.invalid"],
+            "unrelated": "must not be exposed",
+        })
+        with self.assertRaises(BSKNotusResponseError) as raised:
+            await self.client.async_write_control("test-device", "setTemperature", 215)
+        message = str(raised.exception)
+        self.assertIn("HTTP 400: setTemperature is invalid", message)
+        self.assertNotIn("synthetic-token", message)
+        self.assertNotIn("test-device", message)
+        self.assertNotIn("test@example.invalid", message)
+        self.assertNotIn("must not be exposed", message)
+
 
 class ControlTests(unittest.TestCase):
     def test_ranges_scaling_and_invalid_numbers(self):
@@ -193,7 +207,7 @@ class CoordinatorTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_http_rejection_still_reads_back(self):
         self.client.async_write_control.side_effect = BSKNotusResponseError("HTTP 403")
-        with self.assertRaisesRegex(HomeAssistantError, "failed"):
+        with self.assertRaisesRegex(HomeAssistantError, "HTTP 403"):
             await self.coordinator.async_set_control("test-device", "setTemperature", 215)
         self.assertEqual(self.client.async_list_notus_devices.await_count, 5)
         self.assertEqual(self.coordinator.data["test-device"].value("setTemperature"), 210)

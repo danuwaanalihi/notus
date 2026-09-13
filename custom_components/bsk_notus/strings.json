@@ -70,6 +70,66 @@
       },
       "target_humidity": {
         "name": "Target humidity"
+      },
+      "supply_night_speed": {
+        "name": "Supply night speed"
+      },
+      "supply_low_speed": {
+        "name": "Supply low speed"
+      },
+      "supply_medium_speed": {
+        "name": "Supply medium speed"
+      },
+      "supply_high_speed": {
+        "name": "Supply high speed"
+      },
+      "supply_boost_speed": {
+        "name": "Supply boost speed"
+      },
+      "extract_night_speed": {
+        "name": "Extract night speed"
+      },
+      "extract_low_speed": {
+        "name": "Extract low speed"
+      },
+      "extract_medium_speed": {
+        "name": "Extract medium speed"
+      },
+      "extract_high_speed": {
+        "name": "Extract high speed"
+      },
+      "extract_boost_speed": {
+        "name": "Extract boost speed"
+      }
+    },
+    "select": {
+      "supply_fan_preset": {
+        "name": "Supply fan preset",
+        "state": {
+          "night": "Night mode",
+          "low": "Low",
+          "medium": "Medium",
+          "high": "High",
+          "boost": "Boost"
+        }
+      },
+      "extract_fan_preset": {
+        "name": "Extract fan preset",
+        "state": {
+          "night": "Night mode",
+          "low": "Low",
+          "medium": "Medium",
+          "high": "High",
+          "boost": "Boost"
+        }
+      },
+      "free_cooling_mode": {
+        "name": "Free cooling mode",
+        "state": {
+          "off": "Off",
+          "on": "On",
+          "auto": "Auto"
+        }
       }
     },
     "binary_sensor": {

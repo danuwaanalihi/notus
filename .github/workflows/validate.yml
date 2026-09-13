@@ -41,7 +41,7 @@ jobs:
           manifest = parsed["custom_components/bsk_notus/manifest.json"]
           assert manifest["domain"] == "bsk_notus"
           assert manifest["name"] == "BSK NOTUS"
-          assert manifest["version"] == "0.2.0"
+          assert manifest["version"] == "0.3.0"
           assert manifest["config_flow"] is True
           assert manifest["iot_class"] == "cloud_polling"
           assert "bskzephyr" not in " ".join(manifest.get("requirements", [])).lower()
@@ -51,8 +51,11 @@ jobs:
               translation = parsed[f"custom_components/bsk_notus/translations/{language}.json"]
               assert set(translation["config"]["error"]) == set(strings["config"]["error"])
               assert set(translation["entity"]["sensor"]) == set(strings["entity"]["sensor"])
-              for platform in ("binary_sensor", "switch", "number"):
+              for platform in ("binary_sensor", "switch", "number", "select"):
                   assert set(translation["entity"][platform]) == set(strings["entity"][platform])
+
+              for key, description in strings["entity"]["select"].items():
+                  assert set(translation["entity"]["select"][key]["state"]) == set(description["state"])
 
           print("metadata consistency checks passed")
           PY

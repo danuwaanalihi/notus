@@ -70,6 +70,66 @@
       },
       "target_humidity": {
         "name": "Cieľová vlhkosť"
+      },
+      "supply_night_speed": {
+        "name": "Prívod – nočný stupeň"
+      },
+      "supply_low_speed": {
+        "name": "Prívod – nízky stupeň"
+      },
+      "supply_medium_speed": {
+        "name": "Prívod – stredný stupeň"
+      },
+      "supply_high_speed": {
+        "name": "Prívod – vysoký stupeň"
+      },
+      "supply_boost_speed": {
+        "name": "Prívod – boost stupeň"
+      },
+      "extract_night_speed": {
+        "name": "Odťah – nočný stupeň"
+      },
+      "extract_low_speed": {
+        "name": "Odťah – nízky stupeň"
+      },
+      "extract_medium_speed": {
+        "name": "Odťah – stredný stupeň"
+      },
+      "extract_high_speed": {
+        "name": "Odťah – vysoký stupeň"
+      },
+      "extract_boost_speed": {
+        "name": "Odťah – boost stupeň"
+      }
+    },
+    "select": {
+      "supply_fan_preset": {
+        "name": "Stupeň prívodného ventilátora",
+        "state": {
+          "night": "Nočný",
+          "low": "Nízky",
+          "medium": "Stredný",
+          "high": "Vysoký",
+          "boost": "Boost"
+        }
+      },
+      "extract_fan_preset": {
+        "name": "Stupeň odťahového ventilátora",
+        "state": {
+          "night": "Nočný",
+          "low": "Nízky",
+          "medium": "Stredný",
+          "high": "Vysoký",
+          "boost": "Boost"
+        }
+      },
+      "free_cooling_mode": {
+        "name": "Režim voľného chladenia",
+        "state": {
+          "off": "Vypnuté",
+          "on": "Zapnuté",
+          "auto": "Automaticky"
+        }
       }
     },
     "binary_sensor": {

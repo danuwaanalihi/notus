@@ -7,11 +7,9 @@ Unofficial Home Assistant integration for BSK NOTUS heat-recovery ventilation un
 
 ## Status
 
-Version **0.1.0** is intentionally **read-only**.
+Version **0.2.0** preserves all 28 read-only entities from v0.1.0 and adds six user controls for the verified `BSK-IGK-LCD-V1.0` / `IGKLCDV10Device`.
 
-It authenticates against BSK Connect, discovers supported NOTUS units, and exposes their current state in Home Assistant. It does **not** call any device-control endpoint and cannot change fan speed, operating mode, temperature, humidity, boost, heater, free-cooling, or any other setting.
-
-Write support is deliberately deferred until the correct NOTUS write endpoint and payload have been captured and verified on real hardware. The Zephyr write path is not compatible with NOTUS and is not used by this integration.
+The NOTUS write endpoint and sparse payload are grounded in the BSK Connect Android client. See [protocol evidence and confirmation behavior](docs/write-protocol.md). All control state comes from cloud read-back. Writes and polling are serialized; parallel changes send separate fields and cannot replay an old full-device snapshot.
 
 ## Supported device
 
@@ -29,6 +27,19 @@ Discovery accepts a BSK Connect device when either:
 Each discovered NOTUS is represented as one Home Assistant device. The stable identifier preference is `deviceID`, then `mbDeviceId`, then `_id`.
 
 ## Entities
+
+### Controls
+
+| Entity | Range | Cloud field |
+| --- | --- | --- |
+| Power switch | Off / On | `deviceStatus` |
+| Manual boost switch | Off / On | `manualBoostState` |
+| Supply fan speed number | 0–100%, step 1% | `ventilatorFanSpeed` |
+| Extract fan speed number | 0–100%, step 1% | `aspiratorFanSpeed` |
+| Target temperature number | 15.0–30.0 °C, step 0.1 °C | `setTemperature` (raw tenths) |
+| Target humidity number | 0–100%, step 1% | `setHumidity` |
+
+Controls require the verified model/type, a real `deviceID` and a valid existing field. Other readable NOTUS models retain read-only discovery. Existing sensor and binary-sensor identities are unchanged. Free cooling, operation mode, boost speed/time and installer settings remain read-only or unexposed.
 
 ### Sensors
 
@@ -74,10 +85,11 @@ The integration uses only these cloud operations:
 
 - `POST https://connect.bskhvac.com.tr/auth/sign-in` to obtain an access token
 - `GET https://connect.bskhvac.com.tr/device-user` to read device data
+- `PUT https://connect.bskhvac.com.tr/device?deviceID=...` with exactly one verified control field
 
 Device polling is approximately every 60 seconds. If the device-list request returns HTTP 401, the integration performs one fresh login and retries the read once.
 
-No BSK device write endpoint exists in the v0.1.0 code path.
+Each write is preceded by a fresh identity/capability check and followed by cloud read-back, including after an HTTP error or timeout. A failed or mismatched confirmation raises a service error; the integration never fabricates the requested state. An uncertain PUT is not automatically repeated. Read-back can take several seconds while the cloud catches up. A valid cloud value confirms the setting reported by BSK, not an independent measurement of the physical output.
 
 ## Installation with HACS
 

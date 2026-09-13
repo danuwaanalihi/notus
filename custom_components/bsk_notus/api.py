@@ -1,4 +1,4 @@
-"""Read-only client for the undocumented BSK Connect API."""
+"""Client for the undocumented BSK Connect API."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from http import HTTPStatus
 from typing import Any
 
-from aiohttp import ClientError, ClientSession
+from aiohttp import ClientError, ClientSession, ClientTimeout
 
 from .const import (
     API_BASE_URL,
@@ -16,6 +16,7 @@ from .const import (
     SUPPORTED_DEVICE_TYPE,
     SUPPORTED_MODEL_PREFIX,
 )
+from .controls import CONTROLS
 
 
 class BSKNotusError(Exception):
@@ -50,11 +51,7 @@ class NotusDevice:
 
 
 class BSKNotusClient:
-    """Minimal read-only BSK Connect client.
-
-    The POST request is used only for authentication. Device state is fetched
-    exclusively with GET. No device-control/write endpoint is implemented.
-    """
+    """BSK Connect reads plus a restricted, sparse NOTUS write request."""
 
     def __init__(
         self,
@@ -140,6 +137,47 @@ class BSKNotusClient:
             raise BSKNotusResponseError("Device list response was not a JSON list")
 
         return body
+
+    async def async_write_control(self, device_id: str, key: str, raw: int) -> None:
+        """Send exactly one verified field; the coordinator MUST read back.
+
+        Never retry a PUT, including after a timeout: it may already have been
+        applied (and retrying boost could restart its timer). The read-back
+        path also refreshes an expired token for the next explicit request.
+        """
+        control = CONTROLS.get(key)
+        if (
+            not isinstance(device_id, str)
+            or not device_id.strip()
+            or control is None
+            or type(raw) is not int
+            or control.raw_value(raw) is None
+        ):
+            raise BSKNotusResponseError("Invalid NOTUS control request")
+        if self._token is None:
+            await self.async_login()
+        try:
+            async with self._session.put(
+                f"{API_BASE_URL}/device",
+                params={"deviceID": device_id},
+                json={key: raw},
+                headers={"Authorization": self._token},
+                timeout=ClientTimeout(total=20),
+                allow_redirects=False,
+                raise_for_status=False,
+            ) as response:
+                # A PUT response is never used as entity state.
+                if response.status == HTTPStatus.UNAUTHORIZED:
+                    self._token = None
+                    raise BSKNotusAuthError("BSK Connect rejected the write token")
+                if not 200 <= response.status < 300:
+                    raise BSKNotusResponseError(
+                        f"Control request failed with HTTP {response.status}"
+                    )
+        except (ClientError, TimeoutError) as err:
+            raise BSKNotusConnectionError(
+                "Control request did not complete; its result is uncertain"
+            ) from err
 
     async def _async_device_user_request(self) -> tuple[int, Any]:
         """Perform one read-only device-list request."""

@@ -1,0 +1,51 @@
+name: Validate
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Compile Python
+        run: python -m compileall -q custom_components
+
+      - name: Validate JSON and integration metadata
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          json_files = sorted(Path(".").rglob("*.json"))
+          parsed = {}
+          for path in json_files:
+              with path.open(encoding="utf-8") as handle:
+                  parsed[str(path)] = json.load(handle)
+              print(f"valid JSON: {path}")
+
+          manifest = parsed["custom_components/bsk_notus/manifest.json"]
+          assert manifest["domain"] == "bsk_notus"
+          assert manifest["name"] == "BSK NOTUS"
+          assert manifest["version"] == "0.1.0"
+          assert manifest["config_flow"] is True
+          assert manifest["iot_class"] == "cloud_polling"
+          assert "bskzephyr" not in " ".join(manifest.get("requirements", [])).lower()
+
+          strings = parsed["custom_components/bsk_notus/strings.json"]
+          for language in ("en", "sk"):
+              translation = parsed[f"custom_components/bsk_notus/translations/{language}.json"]
+              assert set(translation["config"]["error"]) == set(strings["config"]["error"])
+              assert set(translation["entity"]["sensor"]) == set(strings["entity"]["sensor"])
+              assert set(translation["entity"]["binary_sensor"]) == set(strings["entity"]["binary_sensor"])
+
+          print("metadata consistency checks passed")
+          PY

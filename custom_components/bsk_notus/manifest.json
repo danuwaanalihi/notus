@@ -1,0 +1,11 @@
+{
+  "domain": "bsk_notus",
+  "name": "BSK NOTUS",
+  "codeowners": ["@danuwaanalihi"],
+  "config_flow": true,
+  "documentation": "https://github.com/danuwaanalihi/notus",
+  "issue_tracker": "https://github.com/danuwaanalihi/notus/issues",
+  "iot_class": "cloud_polling",
+  "requirements": [],
+  "version": "0.1.0"
+}

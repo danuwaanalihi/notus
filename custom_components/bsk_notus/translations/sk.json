@@ -1,0 +1,65 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Pripojenie k BSK Connect",
+        "description": "Zadajte prihlasovacie údaje účtu BSK Connect, ku ktorému je priradená jednotka NOTUS.",
+        "data": {
+          "username": "E-mail / používateľské meno",
+          "password": "Heslo"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Opätovné pripojenie BSK NOTUS",
+        "description": "Zadajte aktuálne heslo BSK Connect pre účet {username}.",
+        "data": {
+          "password": "Heslo"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Nesprávne používateľské meno alebo heslo BSK Connect.",
+      "cannot_connect": "K službe BSK Connect sa nedá pripojiť.",
+      "no_notus": "Účet je platný, ale nenašlo sa žiadne podporované zariadenie BSK NOTUS.",
+      "unknown": "Pri nastavovaní BSK NOTUS nastala neočakávaná chyba."
+    },
+    "abort": {
+      "already_configured": "Tento účet BSK Connect je už nakonfigurovaný.",
+      "reauth_successful": "Prihlásenie do BSK Connect bolo úspešne aktualizované."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "return_temperature": {"name": "Teplota odťahovaného vzduchu"},
+      "return_humidity": {"name": "Vlhkosť odťahovaného vzduchu"},
+      "external_temperature": {"name": "Vonkajšia teplota"},
+      "external_humidity": {"name": "Vonkajšia vlhkosť"},
+      "supply_temperature": {"name": "Teplota privádzaného vzduchu"},
+      "supply_humidity": {"name": "Vlhkosť privádzaného vzduchu"},
+      "exhaust_temperature": {"name": "Teplota odvádzaného vzduchu"},
+      "exhaust_humidity": {"name": "Vlhkosť odvádzaného vzduchu"},
+      "supply_fan_speed": {"name": "Výkon prívodného ventilátora"},
+      "extract_fan_speed": {"name": "Výkon odťahového ventilátora"},
+      "supply_fan_rpm": {"name": "Otáčky prívodného ventilátora"},
+      "extract_fan_rpm": {"name": "Otáčky odťahového ventilátora"},
+      "target_temperature": {"name": "Cieľová teplota"},
+      "target_humidity": {"name": "Cieľová vlhkosť"},
+      "wifi_rssi": {"name": "Wi-Fi RSSI"},
+      "return_co2": {"name": "CO₂ odťahovaného vzduchu"},
+      "operation_mode": {"name": "Prevádzkový režim"},
+      "firmware": {"name": "Firmvér"},
+      "mainboard_firmware": {"name": "Firmvér základnej dosky"}
+    },
+    "binary_sensor": {
+      "power": {"name": "Napájanie"},
+      "filter_warning": {"name": "Upozornenie filtra"},
+      "low_fan_speed_warning": {"name": "Upozornenie na nízke otáčky ventilátora"},
+      "manual_boost": {"name": "Manuálny boost"},
+      "humidity_boost": {"name": "Boost podľa vlhkosti"},
+      "external_boost": {"name": "Externý boost"},
+      "free_cooling": {"name": "Voľné chladenie"},
+      "preheater_attached": {"name": "Predohrev pripojený"},
+      "preheater_status": {"name": "Stav predohrevu"}
+    }
+  }
+}

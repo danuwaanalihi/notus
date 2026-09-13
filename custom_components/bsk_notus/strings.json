@@ -1,0 +1,65 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to BSK Connect",
+        "description": "Enter the credentials used by the BSK Connect cloud account that owns the NOTUS unit.",
+        "data": {
+          "username": "Email / username",
+          "password": "Password"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Reconnect BSK NOTUS",
+        "description": "Enter the current BSK Connect password for {username}.",
+        "data": {
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Invalid BSK Connect username or password.",
+      "cannot_connect": "Cannot connect to BSK Connect.",
+      "no_notus": "The account is valid, but no supported BSK NOTUS device was found.",
+      "unknown": "Unexpected error while setting up BSK NOTUS."
+    },
+    "abort": {
+      "already_configured": "This BSK Connect account is already configured.",
+      "reauth_successful": "BSK Connect authentication was updated successfully."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "return_temperature": {"name": "Return temperature"},
+      "return_humidity": {"name": "Return humidity"},
+      "external_temperature": {"name": "External temperature"},
+      "external_humidity": {"name": "External humidity"},
+      "supply_temperature": {"name": "Supply temperature"},
+      "supply_humidity": {"name": "Supply humidity"},
+      "exhaust_temperature": {"name": "Exhaust temperature"},
+      "exhaust_humidity": {"name": "Exhaust humidity"},
+      "supply_fan_speed": {"name": "Supply fan speed"},
+      "extract_fan_speed": {"name": "Extract fan speed"},
+      "supply_fan_rpm": {"name": "Supply fan RPM"},
+      "extract_fan_rpm": {"name": "Extract fan RPM"},
+      "target_temperature": {"name": "Target temperature"},
+      "target_humidity": {"name": "Target humidity"},
+      "wifi_rssi": {"name": "Wi-Fi RSSI"},
+      "return_co2": {"name": "Return CO2"},
+      "operation_mode": {"name": "Operation mode"},
+      "firmware": {"name": "Firmware"},
+      "mainboard_firmware": {"name": "Mainboard firmware"}
+    },
+    "binary_sensor": {
+      "power": {"name": "Power"},
+      "filter_warning": {"name": "Filter warning"},
+      "low_fan_speed_warning": {"name": "Low fan speed warning"},
+      "manual_boost": {"name": "Manual boost"},
+      "humidity_boost": {"name": "Humidity boost"},
+      "external_boost": {"name": "External boost"},
+      "free_cooling": {"name": "Free cooling"},
+      "preheater_attached": {"name": "Preheater attached"},
+      "preheater_status": {"name": "Preheater status"}
+    }
+  }
+}

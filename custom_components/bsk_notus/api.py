@@ -96,8 +96,6 @@ class BSKNotusClient:
                     self._token = token
                     return token
 
-                # The existing BSK cloud behavior has been observed to use 403
-                # and, for some failed sign-ins, 500 for invalid credentials.
                 if response.status in {
                     HTTPStatus.UNAUTHORIZED,
                     HTTPStatus.FORBIDDEN,
@@ -147,6 +145,40 @@ class BSKNotusClient:
 
         return body
 
+    async def async_read_path_for_diagnostics(
+        self, path: str, *, params: Mapping[str, str] | None = None
+    ) -> tuple[int, Any]:
+        """Perform one explicitly read-only authenticated GET for protocol discovery."""
+        if not isinstance(path, str) or not path.startswith("/") or ".." in path:
+            raise BSKNotusResponseError("Invalid diagnostic read path")
+        if self._token is None:
+            await self.async_login()
+
+        status, body = await self._async_read_path_request(path, params)
+        if status == HTTPStatus.UNAUTHORIZED:
+            self._token = None
+            await self.async_login()
+            status, body = await self._async_read_path_request(path, params)
+        return status, body
+
+    async def _async_read_path_request(
+        self, path: str, params: Mapping[str, str] | None
+    ) -> tuple[int, Any]:
+        """Issue a bounded GET only; used by diagnostics, never for control."""
+        assert self._token is not None
+        try:
+            async with self._session.get(
+                f"{API_BASE_URL}{path}",
+                params=params,
+                headers={"Authorization": self._token},
+                timeout=ClientTimeout(total=10),
+                allow_redirects=False,
+                raise_for_status=False,
+            ) as response:
+                return response.status, await _safe_json(response)
+        except (ClientError, TimeoutError) as err:
+            raise BSKNotusConnectionError(str(err)) from err
+
     async def async_write_control(self, device_id: str, key: str, raw: int) -> None:
         """Send exactly one verified field; the coordinator MUST read back.
 
@@ -174,7 +206,6 @@ class BSKNotusClient:
                 allow_redirects=False,
                 raise_for_status=False,
             ) as response:
-                # A PUT response is never used as entity state.
                 if response.status == HTTPStatus.UNAUTHORIZED:
                     self._token = None
                     raise BSKNotusAuthError("BSK Connect rejected the write token")
